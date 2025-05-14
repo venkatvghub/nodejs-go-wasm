@@ -90,6 +90,12 @@ The system uses PostgreSQL for storing encrypted data. You'll need to run the fo
 
 ### Build the WASM Module Manually (Optional)
 
+#### Install tinygo
+```
+brew tap tinygo-org/tools
+brew install tinygo
+tinygo version
+```
 Ensure TinyGo 0.33.0 is installed. Run:
 
 ```bash
