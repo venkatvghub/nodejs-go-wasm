@@ -1,0 +1,27 @@
+{
+  "name": "pii-at-rest",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build:wasm": "tinygo build -o src/crypto.wasm -target=wasi ./wasm",
+    "encrypt:backfill": "tsx src/cli/encrypt-rows.ts",
+    "reset:encrypted": "tsx src/cli/reset-encrypted-data.ts"
+  },
+  "dependencies": {
+    "base64url": "^3.0.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "pg": "^8.11.3",
+    "reflect-metadata": "^0.1.13",
+    "typeorm": "^0.3.19",
+    "uuid": "^9.0.1",
+    "wasi": "^0.0.6"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.15.18",
+    "tsx": "^4.6.3",
+    "typescript": "^5.4.2"
+  }
+}

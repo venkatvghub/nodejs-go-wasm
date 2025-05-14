@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres:15.2-alpine
+    environment:
+      POSTGRES_DB: piidemo
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_PORT: 5432
+    ports:
+      - 5432:5432
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      retries: 5
+  localstack:
+    image: localstack/localstack:latest
+    container_name: localstack
+    ports:
+      - "4566:4566"  # Main LocalStack gateway
+    environment:
+      - SERVICES=kms
+      - DEBUG=1
+      - DEFAULT_REGION=us-east-1
+    volumes:
+      - "./localstack:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+
+#  app:
+#    build: .
+#    env_file: .env
+#    environment:
+#      DATABASE_URL: postgres://temporal:temporal@db:5432/piidemo
+#    depends_on:
+#      db:
+#        condition: service_healthy
+#    command: >
+#      sh -c "
+#        psql $${DATABASE_URL} -f migrations/001_init.sql &&
+#        psql $${DATABASE_URL} -f migrations/000_seed.sql &&
+#        psql $${DATABASE_URL} -f migrations/002_encrypt_columns_json.sql &&
+#        if [ \"$${RUN_BACKFILL}\" = \"true\" ]; then
+#          npm run encrypt:backfill;
+#        fi &&
+#        node dist/index.js
+#      "

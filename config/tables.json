@@ -1,0 +1,14 @@
+{
+  "tables": [
+    {
+      "schema": "public",
+      "table_name": "users",
+      "fields": ["first_name", "last_name", "email"]
+    },
+    {
+      "schema": "public",
+      "table_name": "payments",
+      "fields": ["card_number", "cvv"]
+    }
+  ]
+}
