@@ -2,6 +2,25 @@
 
 This repository is a **full scaffold** for PII encryption using Node.js, TypeORM, and Go-WASM with PostgreSQL.
 
+## Running the Benchmark Script
+
+To benchmark the performance of the XOR encryption vs Node.js native AES-256-CTR:
+
+```bash
+# Run the benchmark with required flags
+node benchmark.js
+
+# For multi-core benchmark with decryption verification
+# The benchmark will automatically limit itself to 4 cores or your CPU core count (whichever is lower)
+node benchmark.js
+```
+
+The benchmark output will show:
+- Encryption/decryption performance metrics across different data sizes
+- CPU usage comparison between XOR and AES-256-CTR implementations
+- Decryption verification to ensure data integrity
+- Multi-core performance scaling
+
 ## Quick Start
 
 ### Generating the AWS KMS DEK
@@ -40,6 +59,34 @@ Copy over the KeyID and Encode the plaintext in base 64 and update .env and .env
 cp .env.example .env
 docker compose up --build
 ```
+
+### Database Migrations
+
+The system uses PostgreSQL for storing encrypted data. You'll need to run the following migrations:
+
+1. **Initial Setup (001_init.sql)**
+   ```bash
+   psql postgres://postgres:postgres@localhost:5432/piidemo -f migrations/001_init.sql
+   ```
+   This creates the users and payments tables with proper structure for PII.
+
+2. **Seed Data (000_seed.sql)** (Optional)
+   ```bash
+   psql postgres://postgres:postgres@localhost:5432/piidemo -f migrations/000_seed.sql
+   ```
+   Populates the database with sample data for testing.
+
+3. **Text Field Encryption (002_encrypt_columns_json.sql)**
+   ```bash
+   psql postgres://postgres:postgres@localhost:5432/piidemo -f migrations/002_encrypt_columns_json.sql
+   ```
+   Converts binary fields to text fields for encrypted data storage.
+
+4. **Run Encryption Backfill**
+   ```bash
+   npm run encrypt:backfill
+   ```
+   Encrypts all existing PII data in the database.
 
 ### Build the WASM Module Manually (Optional)
 
@@ -185,15 +232,18 @@ When retrieving data, observe that:
 docker compose exec app npm run encrypt:backfill
 ```
 
-### Why Go-to-WASM?
+### Why Custom XOR over Standard Crypto?
 
-|                         | Pure Node.js crypto | Go-WASM |
-|-------------------------|---------------------|---------|
-| Portability             | ✅                  | ✅ (single `.wasm`) |
-| Performance             | baseline           | 2-3× faster |
-| Secure sandbox          | 🟡                 | ✅ |
-| Code reuse in Go svcs   | ❌                 | ✅ |
-| Extra toolchain         | none               | TinyGo |
+|                         | Standard Crypto | Custom XOR |
+|-------------------------|-----------------|------------|
+| FIPS 140 Issues         | ❌ Problematic  | ✅ Avoids completely |
+| Performance (small data)| 🟡 Baseline     | ✅ 1.5-2.8× faster |
+| Performance (large data)| ✅ Better       | 🟡 Less efficient |
+| CPU Usage               | 🟡 Higher       | ✅ ~15% lower |
+| Code Simplicity         | 🟡 More complex | ✅ Simpler |
+| Production Readiness    | ✅ Standard     | ❌ Needs enhancement |
+
+Note: This implementation uses a simple XOR encryption primarily for demonstration purposes. For production environments, consider enhancing the security or using a properly vetted standard encryption library.
 
 See the full documentation inside the `docs/` folder.
 
@@ -202,6 +252,7 @@ See the full documentation inside the `docs/` folder.
 - **WASM Compilation Errors**: Ensure TinyGo 0.33.0 is used. Run `tinygo build` with `-v` for verbose output.
 - **Runtime Errors**: Check `.env` for valid `ENCRYPTION_KEYS` (32-byte base64 strings).
 - **API Errors**: Make sure database is properly seeded and encryption key is correctly formatted.
+- **Decryption Issues**: If seeing junk values, check the buffer handling in the decryption function to ensure proper string termination.
 
 # WASM Crypto & Node.js Backfill Guide
 
@@ -256,7 +307,7 @@ npm install
   ENCRYPTION_ENABLED=true
   ```
 
-## 6. Run Database Migrations (if needed)
+## 6. Run Database Migrations
 ```sh
 # From the project root or migrations directory
 psql postgres://postgres:postgres@localhost:5432/piidemo -f migrations/001_init.sql
@@ -276,6 +327,7 @@ npm run encrypt:backfill
 - **WASM nil pointer dereference**: Ensure you are not passing nil or empty buffers to Go WASM functions.
 - **base64url import errors**: Use `import base64url from 'base64url';` and call `base64url.default(...)` for encoding.
 - **TypeORM/reflect-metadata**: Ensure `import 'reflect-metadata';` is the first import in your entry file.
+- **Decryption returns junk characters**: Check for proper null byte handling in the decryption logic.
 
 ---
 
