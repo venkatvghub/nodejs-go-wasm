@@ -190,20 +190,11 @@ export class PiiTransformer {
       
       console.log(`Decryption successful: result length=${plain.length} bytes`);
       
-      // Convert binary to proper string, trimming any null bytes or padding that might be present
-      // First, find the actual string length (up to first null byte if present)
-      let actualLength = plain.length;
-      for (let i = 0; i < plain.length; i++) {
-        if (plain[i] === 0) {
-          actualLength = i;
-          break;
-        }
-      }
+      // Create a proper string from the decrypted data
+      // The WASM decrypt function should now handle trimming null bytes
+      const result = Buffer.from(plain).toString('utf8');
       
-      // Create a new buffer with just the actual string data
-      const stringData = Buffer.from(plain.slice(0, actualLength));
-      const result = stringData.toString('utf8');
-      
+      // Log decoded string for debugging
       console.log(`Decoded string: "${result}" (${result.length} characters)`);
       return result;
     } catch (error) {

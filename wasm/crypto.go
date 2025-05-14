@@ -30,116 +30,65 @@ func goBytes(ptr *uint8, length uint32) []byte {
 	return data
 }
 
-// Simple implementation of AES-like encryption (NOT PRODUCTION READY - for demo only)
-// Format: version (1 byte) + iv (16 bytes) + encrypted data
-func customEncrypt(key, plaintext []byte, version byte) []byte {
+// Extremely simple XOR encryption (NOT SECURE - DEMO ONLY)
+// Format: version (1 byte) + plaintext length (4 bytes) + encrypted data
+func simpleEncrypt(key, plaintext []byte, version byte) []byte {
 	// Basic validation
-	if len(key) != 32 {
-		fmt.Printf("Key must be 32 bytes (received %d bytes)\n", len(key))
+	if len(key) == 0 || len(plaintext) == 0 {
+		fmt.Printf("Invalid input: key length=%d, plaintext length=%d\n", len(key), len(plaintext))
 		return nil
 	}
 
-	// Create a deterministic IV based on key
-	iv := make([]byte, 16)
-	for i := 0; i < 16; i++ {
-		iv[i] = key[i%len(key)] ^ byte(i)
-	}
+	// Calculate output size: version(1) + plaintext length(4) + encrypted data
+	outputSize := 1 + 4 + len(plaintext)
+	result := make([]byte, outputSize)
 
-	// Allocate buffer for encrypted data: version (1) + iv (16) + data + padding
-	// Add padding to make result multiple of 16 bytes
-	paddingLength := 16 - (len(plaintext) % 16)
-	if paddingLength == 0 {
-		paddingLength = 16
-	}
-
-	encryptedLength := len(plaintext) + paddingLength
-	result := make([]byte, 1+len(iv)+encryptedLength)
-
-	// Set version
+	// Set version byte
 	result[0] = version
 
-	// Set IV
-	copy(result[1:], iv)
+	// Store plaintext length in next 4 bytes (big endian)
+	pLen := uint32(len(plaintext))
+	result[1] = byte(pLen >> 24)
+	result[2] = byte(pLen >> 16)
+	result[3] = byte(pLen >> 8)
+	result[4] = byte(pLen)
 
-	// Encrypt data with simple XOR + shifting for demonstration
-	// Not secure, but avoids crypto package issues
+	// Simple XOR encryption with the key
 	for i := 0; i < len(plaintext); i++ {
-		// Get key byte, iv byte, and position-dependent value
-		keyByte := key[i%len(key)]
-		ivByte := iv[i%len(iv)]
-		position := byte(i % 256)
-
-		// Combine inputs to create encrypted byte
-		encryptedByte := plaintext[i] ^ keyByte ^ ivByte ^ position
-
-		// Shift bits for more scrambling
-		encryptedByte = (encryptedByte << 3) | (encryptedByte >> 5)
-
-		// Store encrypted byte
-		result[1+len(iv)+i] = encryptedByte
+		result[5+i] = plaintext[i] ^ key[i%len(key)]
 	}
 
-	// Fill padding with pseudorandom values
-	for i := 0; i < paddingLength; i++ {
-		padPos := len(plaintext) + i
-		result[1+len(iv)+padPos] = byte(padPos) ^ key[padPos%len(key)]
-	}
-
-	// Final length check
-	if len(result) != 1+len(iv)+encryptedLength {
-		fmt.Printf("Encryption error: expected length %d, got %d\n", 1+len(iv)+encryptedLength, len(result))
-	}
-
+	fmt.Printf("Encrypted %d bytes to %d bytes output\n", len(plaintext), len(result))
 	return result
 }
 
-// Simple implementation of AES-like decryption (NOT PRODUCTION READY - for demo only)
-func customDecrypt(key, data []byte) ([]byte, error) {
+// Simple XOR decryption
+func simpleDecrypt(key, data []byte) ([]byte, error) {
 	// Basic validation
-	if len(key) != 32 {
-		return nil, fmt.Errorf("key must be 32 bytes (received %d bytes)", len(key))
+	if len(key) == 0 || len(data) < 5 {
+		return nil, fmt.Errorf("invalid input: key length=%d, data length=%d", len(key), len(data))
 	}
 
-	// Check minimum length: version (1) + iv (16) + at least 16 bytes data
-	if len(data) < 33 {
-		return nil, fmt.Errorf("data too short for decryption: %d bytes", len(data))
-	}
-
-	// Extract version and IV
+	// Extract version
 	version := data[0]
-	iv := data[1:17]
-	ciphertext := data[17:]
 
-	// Decrypt: remove padding and reverse encryption
-	// In AES, the plaintext length is not longer than the ciphertext
-	// We'll assume no more than 16 bytes of padding
-	maxPlaintextLen := len(ciphertext)
-	plaintext := make([]byte, maxPlaintextLen)
+	// Extract plaintext length
+	pLen := uint32(data[1])<<24 | uint32(data[2])<<16 | uint32(data[3])<<8 | uint32(data[4])
 
-	// Perform decryption (reverse of encryption)
-	for i := 0; i < maxPlaintextLen; i++ {
-		// Skip if we're into the padding
-		if i >= maxPlaintextLen {
-			break
-		}
-
-		// Get key byte, iv byte, and position-dependent value
-		keyByte := key[i%len(key)]
-		ivByte := iv[i%len(iv)]
-		position := byte(i % 256)
-
-		// Get encrypted byte and undo bit shifting
-		encryptedByte := ciphertext[i]
-		unshiftedByte := (encryptedByte >> 3) | (encryptedByte << 5)
-
-		// Undo XOR operations
-		plaintext[i] = unshiftedByte ^ keyByte ^ ivByte ^ position
+	// Validate length
+	if uint32(len(data)-5) < pLen {
+		return nil, fmt.Errorf("data too short: expected at least %d bytes, got %d", pLen+5, len(data))
 	}
 
-	// Detect padding - since we're using a debug implementation,
-	// we'll just return all bytes and let the caller figure out the length
+	// Allocate result buffer
+	plaintext := make([]byte, pLen)
 
-	fmt.Printf("Decrypted data with version: %d\n", version)
+	// Decrypt using XOR with the key
+	for i := uint32(0); i < pLen; i++ {
+		plaintext[i] = data[5+i] ^ key[i%uint32(len(key))]
+	}
+
+	fmt.Printf("Decrypted data with version %d, length %d bytes\n", version, pLen)
 	return plaintext, nil
 }
 
@@ -151,8 +100,8 @@ func Encrypt(ver uint8, keyPtr *uint8, keyLen uint32, pPtr *uint8, pLen uint32) 
 
 	fmt.Printf("Encrypt: key length=%d, plaintext length=%d\n", len(key), len(plain))
 
-	// Custom encryption to avoid crypto package
-	encrypted := customEncrypt(key, plain, ver)
+	// Use simple encryption
+	encrypted := simpleEncrypt(key, plain, ver)
 	if encrypted == nil {
 		fmt.Println("Encryption failed")
 		return nil
@@ -179,8 +128,8 @@ func Decrypt(keyPtr *uint8, keyLen uint32, encPtr *uint8, encLen uint32) *uint8 
 
 	fmt.Printf("Decrypt: key length=%d, ciphertext length=%d\n", len(key), len(cipherData))
 
-	// Custom decryption to avoid crypto package
-	plain, err := customDecrypt(key, cipherData)
+	// Simple decryption
+	plain, err := simpleDecrypt(key, cipherData)
 	if err != nil {
 		fmt.Printf("Decryption failed: %v\n", err)
 		return nil
