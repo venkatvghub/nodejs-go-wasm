@@ -316,9 +316,9 @@ npm install
 ## 6. Run Database Migrations
 ```sh
 # From the project root or migrations directory
-psql postgres://postgres:postgres@localhost:5432/piidemo -f migrations/001_init.sql
-psql postgres://postgres:postgres@localhost:5432/piidemo -f migrations/000_seed.sql
-psql postgres://postgres:postgres@localhost:5432/piidemo -f migrations/002_encrypt_columns_json.sql
+psql postgres://postgres:postgres@localhost:5432/piidemo -f migrations/000_init.sql
+psql postgres://postgres:postgres@localhost:5432/piidemo -f migrations/001_seed.sql
+psql postgres://postgres:postgres@localhost:5432/piidemo -f migrations/002_encrypt_columns.sql
 ```
 
 ## 7. Run the Backfill CLI
